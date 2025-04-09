@@ -1,85 +1,85 @@
 @echo off
-rem ウィンドウが一瞬で閉じるのを防ぐためのタイトル設定
-title WarudoSceneConfigChecker 起動ツール
-
-rem 文字コードをUTF-8に設定
-chcp 65001 > nul
+title WarudoSceneConfigChecker Launcher
 setlocal enabledelayedexpansion
 
-rem バッチファイル実行開始メッセージ
-echo [開始] バッチファイルを実行しています...
+echo ===========================================
+echo  WarudoSceneConfigChecker Setup and Launch
+echo ===========================================
 echo.
 
-rem Pythonの存在確認
-echo [確認] Pythonがインストールされているか確認しています...
+rem Check if Python is installed
+echo [START] Running batch file...
+echo.
+
+echo [CHECK] Verifying Python installation...
 where python >nul 2>nul
 if %ERRORLEVEL% neq 0 (
-    echo [エラー] Pythonが見つかりません。
-    echo [エラー] Pythonをインストールしてから再実行してください。
+    echo [ERROR] Python not found.
+    echo [ERROR] Please install Python and try again.
     goto :ERROR
 )
 
-rem Python バージョン表示
-echo [情報] Pythonバージョン:
+rem Display Python version
+echo [INFO] Python version:
 python --version
 echo.
 
-rem 仮想環境の存在確認
+rem Check and create virtual environment
 if not exist "venv" (
-    echo [実行] 仮想環境を作成しています...
+    echo [SETUP] Creating virtual environment...
     python -m venv venv
     if %ERRORLEVEL% neq 0 (
-        echo [エラー] 仮想環境の作成に失敗しました。
-        echo [エラー] Pythonのバージョンが3.5以上か確認してください。
+        echo [ERROR] Failed to create virtual environment.
+        echo [ERROR] Please check if Python version is 3.5 or higher.
         goto :ERROR
     )
 )
 
-rem 仮想環境を有効化
-echo [実行] 仮想環境を有効化しています...
+rem Activate virtual environment
+echo [SETUP] Activating virtual environment...
 call venv\Scripts\activate.bat
 if %ERRORLEVEL% neq 0 (
-    echo [エラー] 仮想環境の有効化に失敗しました。
+    echo [ERROR] Failed to activate virtual environment.
     goto :ERROR
 )
 
-rem 必要なパッケージをインストール
-echo [実行] パッケージをインストールしています...
+rem Install required packages
+echo [SETUP] Installing packages...
 python -m pip install --upgrade pip
 if %ERRORLEVEL% neq 0 (
-    echo [エラー] pipのアップグレードに失敗しました。
+    echo [ERROR] Failed to upgrade pip.
     goto :ERROR
 )
 
 python -m pip install -r requirements.txt
 if %ERRORLEVEL% neq 0 (
-    echo [エラー] パッケージのインストールに失敗しました。
-    echo [情報] requirements.txt ファイルの存在を確認してください。
+    echo [ERROR] Failed to install required packages.
+    echo [INFO] Please check if requirements.txt exists.
     goto :ERROR
 )
 
-rem Pythonスクリプトを実行
-echo [実行] シーンチェッカーを起動しています...
+rem Run Python script
+echo [RUN] Launching scene checker...
 python warudo_scene_checker.py
 if %ERRORLEVEL% neq 0 (
-    echo [エラー] プログラムの実行中にエラーが発生しました。
+    echo [ERROR] An error occurred while running the program.
     goto :ERROR
 )
 
-rem 仮想環境を無効化
+rem Deactivate virtual environment
 call venv\Scripts\deactivate.bat
 
 echo.
-echo [完了] 処理が正常に終了しました。
+echo [COMPLETE] Process finished successfully.
 goto :END
 
 :ERROR
 echo.
-echo [終了] エラーが発生したため、処理を中断しました。
+echo [EXIT] Process terminated due to an error.
 echo.
 
 :END
 echo.
-echo 終了するには何かキーを押してください...
+echo Press any key to exit...
 pause > nul
 exit /b 0
