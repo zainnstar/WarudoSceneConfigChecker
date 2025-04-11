@@ -5,13 +5,9 @@ import os
 import json
 import re
 from collections import defaultdict
-from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, QHBoxLayout, 
-                               QWidget, QFileDialog, QTreeWidget, QTreeWidgetItem, QLabel, 
-                               QSplitter, QTextEdit, QGroupBox, QCheckBox, QMenuBar, QMenu,
-                               QDialog, QRadioButton, QButtonGroup)
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QFont, QColor, QAction
-
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox, scrolledtext
+from tkinter.font import Font
 
 # 多言語対応用の辞書
 TRANSLATIONS = {
@@ -122,55 +118,69 @@ TRANSLATIONS = {
 }
 
 
-class LanguageDialog(QDialog):
+class LanguageDialog(tk.Toplevel):
     def __init__(self, parent=None, current_language="ja"):
         super().__init__(parent)
+        self.parent = parent
         self.current_language = current_language
+        self.result = None
         self.setup_ui()
         
+        # モーダルダイアログにする
+        self.transient(parent)
+        self.grab_set()
+        
     def setup_ui(self):
-        self.setWindowTitle(self.parent().get_text("dialog_language"))
-        layout = QVBoxLayout(self)
+        self.title(self.parent.get_text("dialog_language"))
         
         # 言語選択用のラジオボタン
-        self.button_group = QButtonGroup(self)
+        self.language_var = tk.StringVar(value=self.current_language)
+        
+        frame = ttk.Frame(self, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
         
         # 日本語
-        self.radio_ja = QRadioButton(self.parent().get_text("japanese"))
-        self.button_group.addButton(self.radio_ja)
-        layout.addWidget(self.radio_ja)
+        ttk.Radiobutton(frame, text=self.parent.get_text("japanese"),
+                        variable=self.language_var, value="ja").pack(anchor=tk.W)
         
         # 英語
-        self.radio_en = QRadioButton(self.parent().get_text("english"))
-        self.button_group.addButton(self.radio_en)
-        layout.addWidget(self.radio_en)
-        
-        # 現在の言語を選択
-        if self.current_language == "ja":
-            self.radio_ja.setChecked(True)
-        else:
-            self.radio_en.setChecked(True)
+        ttk.Radiobutton(frame, text=self.parent.get_text("english"),
+                        variable=self.language_var, value="en").pack(anchor=tk.W)
         
         # ボタンレイアウト
-        button_layout = QHBoxLayout()
+        button_frame = ttk.Frame(frame)
+        button_frame.pack(fill=tk.X, pady=(10, 0))
         
         # OKボタン
-        ok_button = QPushButton(self.parent().get_text("dialog_ok"))
-        ok_button.clicked.connect(self.accept)
+        ok_button = ttk.Button(button_frame, text=self.parent.get_text("dialog_ok"), 
+                               command=self.ok_clicked)
+        ok_button.pack(side=tk.RIGHT, padx=(5, 0))
         
         # キャンセルボタン
-        cancel_button = QPushButton(self.parent().get_text("dialog_cancel"))
-        cancel_button.clicked.connect(self.reject)
+        cancel_button = ttk.Button(button_frame, text=self.parent.get_text("dialog_cancel"), 
+                                   command=self.cancel_clicked)
+        cancel_button.pack(side=tk.RIGHT)
         
-        button_layout.addWidget(ok_button)
-        button_layout.addWidget(cancel_button)
-        layout.addLayout(button_layout)
+        # ダイアログをセンタリング
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
+    
+    def ok_clicked(self):
+        self.result = self.language_var.get()
+        self.destroy()
+        
+    def cancel_clicked(self):
+        self.destroy()
     
     def get_selected_language(self):
-        return "ja" if self.radio_ja.isChecked() else "en"
+        return self.result
 
 
-class WarudoSceneChecker(QMainWindow):
+class WarudoSceneChecker(tk.Tk):
     SETTINGS_FILE = "settings.json"
 
 
@@ -178,18 +188,14 @@ class WarudoSceneChecker(QMainWindow):
         super().__init__()
         self.current_language = self.load_language_setting()  # 言語設定を復元
 
-
-        # メニューバーの作成
-        self.create_menu_bar()
-        
         # 色の定義
-        self.workshop_color = QColor(144, 238, 144)  # 薄緑色（ライトグリーン）
-        self.missing_file_color = QColor(255, 0, 0)  # 赤色（存在しないファイル）
+        self.workshop_color = "#90EE90"  # 薄緑色（ライトグリーン）
+        self.missing_file_color = "#FF0000"  # 赤色（存在しないファイル）
         self.subfolder_colors = {
-            "Props": QColor(255, 200, 0),       # 濃い黄色
-            "Environment": QColor(135, 206, 250), # 明るい青色
-            "Characters": QColor(255, 160, 122),  # 明るいサーモンピンク
-            "Particles": QColor(221, 160, 221)    # 薄い紫色
+            "Props": "#FFC800",       # 濃い黄色
+            "Environment": "#87CEFA", # 明るい青色
+            "Characters": "#FFA07A",  # 明るいサーモンピンク
+            "Particles": "#DDA0DD"    # 薄い紫色
         }
         
         # プロトコル接頭辞リスト
@@ -228,17 +234,30 @@ class WarudoSceneChecker(QMainWindow):
         
         self.debug_mode = False  # デバッグモード
         
-        self.update_ui_texts()
+        # ウィンドウの設定
+        self.title(self.get_text("window_title"))
+        self.geometry("1000x700")
         
+        # メニューバーの作成
+        self.create_menu_bar()
+        
+        # UIの構築
         self.setup_ui()
+        
+        # データ保存用
+        self.current_file_path = None
+        self.scene_data = None
 
 
     def load_language_setting(self):
         """保存された言語設定を読み込む"""
         if os.path.exists(self.SETTINGS_FILE):
-            with open(self.SETTINGS_FILE, "r", encoding="utf-8") as file:
-                settings = json.load(file)
-                return settings.get("language", "ja")  # デフォルトは日本語
+            try:
+                with open(self.SETTINGS_FILE, "r", encoding="utf-8") as file:
+                    settings = json.load(file)
+                    return settings.get("language", "ja")  # デフォルトは日本語
+            except:
+                return "ja"
         return "ja"
 
 
@@ -251,28 +270,31 @@ class WarudoSceneChecker(QMainWindow):
 
     def create_menu_bar(self):
         """メニューバーを作成する"""
-        self.menuBar().clear()  # 既存のメニューをクリア
-
-
-        menu_bar = self.menuBar()
-        settings_menu = menu_bar.addMenu(self.get_text("menu_settings"))
-
-
-        language_action = QAction(self.get_text("menu_language"), self)
-        language_action.triggered.connect(self.show_language_dialog)
-        settings_menu.addAction(language_action)
+        self.menu_bar = tk.Menu(self)
+        self.config(menu=self.menu_bar)
+        
+        # 設定メニュー
+        settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        settings_menu.add_command(
+            label=self.get_text("menu_language"), 
+            command=self.show_language_dialog
+        )
+        self.menu_bar.add_cascade(label=self.get_text("menu_settings"), menu=settings_menu)
 
 
     def show_language_dialog(self):
         """言語設定ダイアログを表示"""
         dialog = LanguageDialog(self, self.current_language)
-        if dialog.exec() == QDialog.Accepted:
-            new_language = dialog.get_selected_language()
-            if new_language != self.current_language:
-                self.current_language = new_language
-                self.save_language_setting()  # 設定を保存
-                self.update_ui_texts()
-                self.create_menu_bar()  # メニューバーも更新
+        self.wait_window(dialog)
+        
+        new_language = dialog.get_selected_language()
+        if new_language and new_language != self.current_language:
+            self.current_language = new_language
+            self.save_language_setting()  # 設定を保存
+            self.update_ui_texts()
+            # メニューバーも更新
+            self.menu_bar.destroy()
+            self.create_menu_bar()
 
 
     def get_text(self, key, **kwargs):
@@ -283,142 +305,204 @@ class WarudoSceneChecker(QMainWindow):
 
     def update_ui_texts(self):
         """UI全体のテキストを現在の言語で更新"""
-        self.setWindowTitle(self.get_text("window_title"))
+        self.title(self.get_text("window_title"))
         
         if hasattr(self, 'file_path_label'):
             if self.current_file_path:
-                self.file_path_label.setText(os.path.basename(self.current_file_path))
+                self.file_path_label["text"] = os.path.basename(self.current_file_path)
             else:
-                self.file_path_label.setText(self.get_text("json_not_selected"))
-
+                self.file_path_label["text"] = self.get_text("json_not_selected")
 
         if hasattr(self, 'assets_path_label'):
             if self.streaming_assets_path:
-                self.assets_path_label.setText(os.path.basename(self.streaming_assets_path))
+                self.assets_path_label["text"] = os.path.basename(self.streaming_assets_path)
             else:
-                self.assets_path_label.setText(self.get_text("folder_not_selected"))
+                self.assets_path_label["text"] = self.get_text("folder_not_selected")
 
+        if hasattr(self, 'json_group'):
+            self.json_group["text"] = self.get_text("json_group")
 
-        # 他のUI要素の更新も同様に実装
+        if hasattr(self, 'assets_group'):
+            self.assets_group["text"] = self.get_text("assets_group")
+
+        if hasattr(self, 'options_group'):
+            self.options_group["text"] = self.get_text("options_group")
+
+        if hasattr(self, 'file_select_button'):
+            self.file_select_button["text"] = self.get_text("select_json")
+
+        if hasattr(self, 'assets_select_button'):
+            self.assets_select_button["text"] = self.get_text("select_assets")
+
+        if hasattr(self, 'verify_files_cb'):
+            self.verify_files_cb["text"] = self.get_text("verify_files")
+
+        if hasattr(self, 'debug_cb'):
+            self.debug_cb["text"] = self.get_text("show_debug")
+
+        if hasattr(self, 'analyze_button'):
+            self.analyze_button["text"] = self.get_text("analyze_button")
+
+        # ツリービューの列ヘッダーも更新
+        if hasattr(self, 'tree_widget'):
+            self.tree_widget.heading("#1", text=self.get_text("column_object"))
+            self.tree_widget.heading("#2", text=self.get_text("column_path"))
+            self.tree_widget.heading("#3", text=self.get_text("column_status"))
 
 
     def setup_ui(self):
-        central_widget = QWidget()
-        main_layout = QVBoxLayout(central_widget)
-
+        # メインフレーム
+        main_frame = ttk.Frame(self)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # ファイル選択エリア
-        file_layout = QHBoxLayout()
-
+        file_frame = ttk.Frame(main_frame)
+        file_frame.pack(fill=tk.X, pady=(0, 10))
 
         # JSON選択グループ
-        json_group = QGroupBox(self.get_text("json_group"))
-        json_layout = QHBoxLayout(json_group)
-        self.file_path_label = QLabel(self.get_text("json_not_selected"))
-        file_select_button = QPushButton(self.get_text("select_json"))
-        file_select_button.clicked.connect(self.select_file)
-        json_layout.addWidget(self.file_path_label)
-        json_layout.addWidget(file_select_button)
+        self.json_group = ttk.LabelFrame(file_frame, text=self.get_text("json_group"))
+        self.json_group.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
 
+        json_inner_frame = ttk.Frame(self.json_group, padding=5)
+        json_inner_frame.pack(fill=tk.X, expand=True)
+
+        self.file_path_label = ttk.Label(json_inner_frame, text=self.get_text("json_not_selected"))
+        self.file_path_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        self.file_select_button = ttk.Button(json_inner_frame, text=self.get_text("select_json"), command=self.select_file)
+        self.file_select_button.pack(side=tk.RIGHT)
 
         # StreamingAssets選択グループ
-        assets_group = QGroupBox(self.get_text("assets_group"))
-        assets_layout = QHBoxLayout(assets_group)
-        self.assets_path_label = QLabel(self.get_text("folder_not_selected"))
-        assets_select_button = QPushButton(self.get_text("select_assets"))
-        assets_select_button.clicked.connect(self.select_streaming_assets)
-        assets_layout.addWidget(self.assets_path_label)
-        assets_layout.addWidget(assets_select_button)
+        self.assets_group = ttk.LabelFrame(file_frame, text=self.get_text("assets_group"))
+        self.assets_group.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 5))
 
+        assets_inner_frame = ttk.Frame(self.assets_group, padding=5)
+        assets_inner_frame.pack(fill=tk.X, expand=True)
 
-        # ファイル検証オプション
-        options_group = QGroupBox(self.get_text("options_group"))
-        options_layout = QHBoxLayout(options_group)
-        self.verify_files_cb = QCheckBox(self.get_text("verify_files"))
-        self.verify_files_cb.setChecked(True)
-        self.debug_cb = QCheckBox(self.get_text("show_debug"))
-        self.debug_cb.setChecked(False)
-        self.debug_cb.stateChanged.connect(self.toggle_debug_mode)
-        options_layout.addWidget(self.verify_files_cb)
-        options_layout.addWidget(self.debug_cb)
+        self.assets_path_label = ttk.Label(assets_inner_frame, text=self.get_text("folder_not_selected"))
+        self.assets_path_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
+        self.assets_select_button = ttk.Button(
+            assets_inner_frame, 
+            text=self.get_text("select_assets"), 
+            command=self.select_streaming_assets
+        )
+        self.assets_select_button.pack(side=tk.RIGHT)
 
-        # ファイル選択エリアを1行にまとめる
-        file_layout.addWidget(json_group)
-        file_layout.addWidget(assets_group)
-        file_layout.addWidget(options_group)
+        # オプショングループ
+        self.options_group = ttk.LabelFrame(file_frame, text=self.get_text("options_group"))
+        self.options_group.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
 
+        options_inner_frame = ttk.Frame(self.options_group, padding=5)
+        options_inner_frame.pack(fill=tk.X, expand=True)
 
-        # メインコンテンツエリア
-        splitter = QSplitter(Qt.Vertical)
+        self.verify_var = tk.BooleanVar(value=True)
+        self.verify_files_cb = ttk.Checkbutton(
+            options_inner_frame, 
+            text=self.get_text("verify_files"),
+            variable=self.verify_var
+        )
+        self.verify_files_cb.pack(side=tk.LEFT, padx=(0, 10))
 
+        self.debug_var = tk.BooleanVar(value=False)
+        self.debug_cb = ttk.Checkbutton(
+            options_inner_frame, 
+            text=self.get_text("show_debug"),
+            variable=self.debug_var, 
+            command=self.toggle_debug_mode
+        )
+        self.debug_cb.pack(side=tk.LEFT)
+
+        # ペインウィンドウ（分割ビュー）
+        paned = ttk.PanedWindow(main_frame, orient=tk.VERTICAL)
+        paned.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
         # ツリービュー
-        self.tree_widget = QTreeWidget()
-        self.tree_widget.setHeaderLabels([
-            self.get_text("column_object"),
-            self.get_text("column_path"),
-            self.get_text("column_status")
-        ])
-        self.tree_widget.setColumnWidth(0, 300)
-        self.tree_widget.setColumnWidth(1, 400)
+        tree_frame = ttk.Frame(paned)
+        paned.add(tree_frame, weight=3)
 
+        # スクロールバー
+        tree_scroll_y = ttk.Scrollbar(tree_frame)
+        tree_scroll_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree_scroll_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL)
+        tree_scroll_x.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Treeview ウィジェット
+        self.tree_widget = ttk.Treeview(
+            tree_frame, 
+            columns=("object", "path", "status"), 
+            show="headings",
+            yscrollcommand=tree_scroll_y.set,
+            xscrollcommand=tree_scroll_x.set
+        )
+        self.tree_widget.pack(fill=tk.BOTH, expand=True)
+
+        # スクロールバーをツリービューに接続
+        tree_scroll_y.config(command=self.tree_widget.yview)
+        tree_scroll_x.config(command=self.tree_widget.xview)
+
+        # 列の設定
+        self.tree_widget.heading("object", text=self.get_text("column_object"))
+        self.tree_widget.heading("path", text=self.get_text("column_path"))
+        self.tree_widget.heading("status", text=self.get_text("column_status"))
+        
+        self.tree_widget.column("object", width=300)
+        self.tree_widget.column("path", width=400)
+        self.tree_widget.column("status", width=100)
 
         # テキスト表示エリア
-        self.text_edit = QTextEdit()
-        self.text_edit.setReadOnly(True)
+        text_frame = ttk.Frame(paned)
+        paned.add(text_frame, weight=1)
 
-
-        splitter.addWidget(self.tree_widget)
-        splitter.addWidget(self.text_edit)
-        splitter.setSizes([400, 200])
-
+        # テキストウィジェットとスクロールバー
+        text_scroll = ttk.Scrollbar(text_frame)
+        text_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.text_edit = scrolledtext.ScrolledText(text_frame, wrap=tk.WORD)
+        self.text_edit.pack(fill=tk.BOTH, expand=True)
+        self.text_edit.config(state=tk.DISABLED)  # 読み取り専用
+        
+        text_scroll.config(command=self.text_edit.yview)
+        self.text_edit.config(yscrollcommand=text_scroll.set)
 
         # 分析ボタン
-        analyze_button = QPushButton(self.get_text("analyze_button"))
-        analyze_button.clicked.connect(self.analyze_scene_data)
-
-
-        # レイアウトに追加
-        main_layout.addLayout(file_layout)
-        main_layout.addWidget(splitter)
-        main_layout.addWidget(analyze_button)
-
-
-        self.setCentralWidget(central_widget)
-
-
-        # データ保存用
-        self.current_file_path = None
-        self.scene_data = None
+        self.analyze_button = ttk.Button(
+            main_frame, 
+            text=self.get_text("analyze_button"), 
+            command=self.analyze_scene_data
+        )
+        self.analyze_button.pack(fill=tk.X)
     
-    def toggle_debug_mode(self, state):
+    def toggle_debug_mode(self):
         """デバッグモードの切り替え"""
-        self.debug_mode = state == Qt.Checked
+        self.debug_mode = self.debug_var.get()
         
     def select_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "JSONファイルを選択", "", "JSONファイル (*.json)")
+        file_path = filedialog.askopenfilename(
+            title="JSONファイルを選択", 
+            filetypes=[("JSONファイル", "*.json")]
+        )
         if file_path:
             self.current_file_path = file_path
-            self.file_path_label.setText(os.path.basename(file_path))
+            self.file_path_label["text"] = os.path.basename(file_path)
             
             # ファイル読み込み
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     self.scene_data = json.load(f)
-                self.text_edit.setPlainText(self.get_text("file_loaded", path=file_path))
+                self._set_text_content(self.get_text("file_loaded", path=file_path))
             except json.JSONDecodeError as e:
-                self.text_edit.setPlainText(self.get_text("json_error", error=str(e)))
+                self._set_text_content(self.get_text("json_error", error=str(e)))
                 self.scene_data = None
             except Exception as e:
-                self.text_edit.setPlainText(self.get_text("file_error", error=str(e)))
+                self._set_text_content(self.get_text("file_error", error=str(e)))
                 self.scene_data = None
     
     def select_streaming_assets(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "StreamingAssetsフォルダを選択")
+        folder_path = filedialog.askdirectory(title="StreamingAssetsフォルダを選択")
         if folder_path:
             self.streaming_assets_path = folder_path
-            self.assets_path_label.setText(os.path.basename(folder_path) or folder_path)
+            self.assets_path_label["text"] = os.path.basename(folder_path) or folder_path
             
             # StreamingAssets内のファイル一覧を収集
             self._scan_streaming_assets()
@@ -436,7 +520,14 @@ class WarudoSceneChecker(QMainWindow):
                     if len(files) > 3:
                         asset_summary += self.get_text("more_files", count=len(files) - 3) + "\n"
                     
-            self.text_edit.setPlainText(asset_summary)
+            self._set_text_content(asset_summary)
+
+    def _set_text_content(self, text):
+        """テキストエディタの内容を設定する"""
+        self.text_edit.config(state=tk.NORMAL)
+        self.text_edit.delete(1.0, tk.END)
+        self.text_edit.insert(tk.END, text)
+        self.text_edit.config(state=tk.DISABLED)
     
     def _scan_streaming_assets(self):
         """StreamingAssetsフォルダをスキャンしてファイル一覧を作成"""
@@ -561,10 +652,12 @@ class WarudoSceneChecker(QMainWindow):
     
     def analyze_scene_data(self):
         if not self.scene_data:
-            self.text_edit.setPlainText(self.get_text("select_json_first"))
+            self._set_text_content(self.get_text("select_json_first"))
             return
             
-        self.tree_widget.clear()
+        # ツリーをクリア
+        for item in self.tree_widget.get_children():
+            self.tree_widget.delete(item)
         
         # カテゴリ別にオブジェクトを整理
         environments = []
@@ -582,36 +675,36 @@ class WarudoSceneChecker(QMainWindow):
         char_counts = self._group_objects_by_path(characters)
         particle_counts = self._group_objects_by_path(particles)
         
-        # ツリービューに追加
-        root = self.tree_widget.invisibleRootItem()
-        
+        # ツリービューにカテゴリとアイテムを追加
         # 環境オブジェクト
         if env_counts:
-            env_root = QTreeWidgetItem(root, [self.get_text("env_category")])
+            env_root = self.tree_widget.insert("", tk.END, text=self.get_text("env_category"), values=(self.get_text("env_category"), "", ""))
             self._add_objects_to_tree(env_root, env_counts, "Environment")
         
         # アイテム
         if prop_counts:
-            prop_root = QTreeWidgetItem(root, [self.get_text("prop_category")])
+            prop_root = self.tree_widget.insert("", tk.END, text=self.get_text("prop_category"), values=(self.get_text("prop_category"), "", ""))
             self._add_objects_to_tree(prop_root, prop_counts, "Props")
         
         # キャラクター
         if char_counts:
-            char_root = QTreeWidgetItem(root, [self.get_text("char_category")])
+            char_root = self.tree_widget.insert("", tk.END, text=self.get_text("char_category"), values=(self.get_text("char_category"), "", ""))
             self._add_objects_to_tree(char_root, char_counts, "Characters")
         
         # パーティクル
         if particle_counts:
-            particle_root = QTreeWidgetItem(root, [self.get_text("particle_category")])
+            particle_root = self.tree_widget.insert("", tk.END, text=self.get_text("particle_category"), values=(self.get_text("particle_category"), "", ""))
             self._add_objects_to_tree(particle_root, particle_counts, "Particles")
         
         # その他のオブジェクト
         if other_objects:
-            other_root = QTreeWidgetItem(root, [self.get_text("other_category")])
+            other_root = self.tree_widget.insert("", tk.END, text=self.get_text("other_category"), values=(self.get_text("other_category"), "", ""))
             for obj in other_objects:
-                QTreeWidgetItem(other_root, [obj.get('name', 'Unknown'), obj.get('path', '')])
+                self.tree_widget.insert(other_root, tk.END, values=(obj.get('name', 'Unknown'), obj.get('path', ''), ""))
         
-        self.tree_widget.expandAll()
+        # すべてのアイテムを展開
+        for item in self.tree_widget.get_children():
+            self.tree_widget.item(item, open=True)
         
         # サマリーを表示
         summary = self.get_text("analysis_results") + "\n"
@@ -629,7 +722,7 @@ class WarudoSceneChecker(QMainWindow):
         self._check_for_subfolder_issues(environments, props, characters, particles, issues)
         
         # ファイル存在の問題チェック
-        if self.verify_files_cb.isChecked() and self.streaming_assets_path:
+        if self.verify_var.get() and self.streaming_assets_path:
             self._check_for_missing_files(environments, props, characters, particles, missing_files)
         
         if issues:
@@ -645,7 +738,7 @@ class WarudoSceneChecker(QMainWindow):
         if not issues and not missing_files:
             summary += self.get_text("no_issues")
             
-        self.text_edit.setPlainText(summary)
+        self._set_text_content(summary)
     
     def _group_objects_by_path(self, objects):
         """同じパスを持つオブジェクトをグループ化して、出現回数をカウントする"""
@@ -680,28 +773,28 @@ class WarudoSceneChecker(QMainWindow):
             status = ""
             
             # ツリーアイテム作成
-            item = QTreeWidgetItem(parent_item, [display_name, path, status])
+            item_id = self.tree_widget.insert(parent_item, tk.END, values=(display_name, path, status))
             
             # サブフォルダの確認（色付け）
-            is_in_subfolder = self._check_subfolder(item, path)
+            is_in_subfolder = self._check_subfolder(item_id, path)
             
             # ファイルが存在するかチェック
-            if self.verify_files_cb.isChecked() and self.streaming_assets_path:
+            if self.verify_var.get() and self.streaming_assets_path:
                 file_exists = self._check_file_exists(path, category)
                 
                 if file_exists:
-                    item.setText(2, self.get_text("file_verified"))
+                    self.tree_widget.set(item_id, "status", self.get_text("file_verified"))
                 else:
-                    item.setText(2, self.get_text("file_not_found"))
-                    item.setForeground(0, QBrush(self.missing_file_color))
-                    item.setForeground(1, QBrush(self.missing_file_color))
-                    item.setForeground(2, QBrush(self.missing_file_color))
-            
-            # 使用回数の多いアイテムは太字で表示（5回以上）
-            if count > 5:
-                font = QFont()
-                font.setBold(True)
-                item.setFont(0, font)
+                    self.tree_widget.set(item_id, "status", self.get_text("file_not_found"))
+                    # tkの場合は後でタグを使って色を設定
+                    self.tree_widget.item(item_id, tags=("missing",))
+        
+        # 赤色のタグを定義
+        self.tree_widget.tag_configure("missing", foreground=self.missing_file_color)
+        # その他のタグも同様に定義
+        self.tree_widget.tag_configure("workshop", background=self.workshop_color)
+        for category, color in self.subfolder_colors.items():
+            self.tree_widget.tag_configure(f"subfolder_{category.lower()}", background=color)
     
     def _extract_objects(self, data, environments, props, characters, particles, other_objects):
         """JSONデータを再帰的に処理して、関連するオブジェクトを抽出する"""
@@ -758,18 +851,17 @@ class WarudoSceneChecker(QMainWindow):
             
         return name
     
-    def _check_subfolder(self, item, path):
+    def _check_subfolder(self, item_id, path):
         """サブフォルダ内のオブジェクトかをチェック"""
         if not path:
             return False
             
         # "workshop/" はワークショップアイテム
         if "workshop/" in path:
-            item.setBackground(0, QBrush(self.workshop_color))
-            item.setForeground(0, Qt.black)
-            current_text = item.text(0)
+            current_text = self.tree_widget.item(item_id, "values")[0]
             if f" ({self.get_text('workshop_label')})" not in current_text:
-                item.setText(0, f"{current_text} ({self.get_text('workshop_label')})")
+                self.tree_widget.set(item_id, "object", f"{current_text} ({self.get_text('workshop_label')})")
+            self.tree_widget.item(item_id, tags=("workshop",))
             return False
             
         # 各種フォルダのサブフォルダチェックを統合
@@ -784,28 +876,18 @@ class WarudoSceneChecker(QMainWindow):
             if folder_path in path and path.count('/') > 2:
                 parts = path.split('/')
                 if len(parts) > 3 and parts[2] == folder_name and len(parts) > 4:
-                    # カテゴリ別に色を変える
-                    color = self.subfolder_colors.get(folder_name, QColor(255, 255, 0))  # デフォルトは黄色
-                    
-                    # 背景色と前景色を設定
-                    item.setBackground(0, QBrush(color))
-                    item.setBackground(1, QBrush(color))
-                    item.setForeground(0, Qt.black)
-                    item.setForeground(1, Qt.black)
-                    
-                    # フォント設定
-                    font = QFont()
-                    font.setBold(True)
-                    item.setFont(0, font)
-                    item.setFont(1, font)
-                    
-                    # ステータス列に情報を追加
                     subfolder_name = parts[3]
-                    item.setText(2, f"{self.get_text('subfolder_label')}: {subfolder_name}")
                     
-                    current_text = item.text(0)
+                    # 表示テキストを更新
+                    current_text = self.tree_widget.item(item_id, "values")[0]
                     if f" ({self.get_text('subfolder_label')}: {subfolder_name})" not in current_text:
-                        item.setText(0, f"{current_text} ({self.get_text('subfolder_label')}: {subfolder_name})")
+                        self.tree_widget.set(item_id, "object", f"{current_text} ({self.get_text('subfolder_label')}: {subfolder_name})")
+                    
+                    # フォルダ名の列にもサブフォルダ名を表示
+                    self.tree_widget.set(item_id, "status", f"{self.get_text('subfolder_label')}: {subfolder_name}")
+                    
+                    # タグを使用して色を設定
+                    self.tree_widget.item(item_id, tags=(f"subfolder_{folder_name.lower()}",))
                     
                     return True
         
@@ -945,10 +1027,6 @@ class WarudoSceneChecker(QMainWindow):
                     reported_paths.add(path)
 
 
-
-
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = WarudoSceneChecker()
-    window.show()
-    sys.exit(app.exec())
+    app = WarudoSceneChecker()
+    app.mainloop()

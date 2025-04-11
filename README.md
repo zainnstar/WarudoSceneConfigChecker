@@ -4,49 +4,13 @@ This is a script that checks whether the assets in the warudo scene file are in 
 
 このスクリプトは、warudo のシーンファイルに含まれるアセットが StreamingAssets フォルダに存在するかどうかを確認します。
 
-## Installation / インストール方法
+## インストール方法
 
-### English
+1. Python がインストールされていることを確認してください（tkinter が必要です）
+2. このリポジトリをダウンロードしてください
+3. `start_checker.bat` でアプリケーションを起動できます
 
-1. Make sure you have Python installed on your system
-2. Clone or download this repository
-3. Install required dependencies:
-
-```
-pip install -r requirements.txt
-```
-
-### 日本語
-
-1. Python がインストールされていることを確認してください
-2. このリポジトリをクローンまたはダウンロードしてください
-3. 必要な依存関係をインストールします：
-
-```
-pip install -r requirements.txt
-```
-
-## Usage / 使用方法
-
-### English
-
-1. Launch the application by running `start_checker.bat`
-2. Load Scene File:
-   - Click "Load Scene File" button
-   - Select your Warudo scene file (\*.json)
-3. Set StreamingAssets Folder:
-   - Click "Set StreamingAssets Folder" button
-   - Select your Warudo's StreamingAssets folder
-
-Options:
-
-- Check missing files: Detects files referenced in the scene but missing from StreamingAssets
-- Check unused files: Finds files in StreamingAssets that aren't used in the scene
-- Include subdirectories: Also checks files in subdirectories of StreamingAssets
-
-Click "Analyze" to start the check. Results will be displayed in the application window.
-
-### 日本語
+## 使用方法
 
 1. `start_checker.bat`を実行してアプリケーションを起動します
 2. シーンファイルの読み込み：

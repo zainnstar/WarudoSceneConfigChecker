@@ -1,59 +1,44 @@
 @echo off
+setlocal enabledelayedexpansion
 rem Simple batch file for WarudoSceneConfigChecker
 title WarudoSceneConfigChecker
 
-echo Starting setup and launch process...
+rem Set code page to UTF-8
+chcp 65001 > nul
+
+echo Starting WarudoSceneConfigChecker...
 echo.
 
 rem Check Python installation
-where python >nul 2>nul
+python --version > nul 2> nul
 if errorlevel 1 (
     echo ERROR: Python not found.
     echo Please install Python and try again.
-    goto end
+    pause
+    exit /b 1
 )
 
-echo Python version:
-python --version
-echo.
-
-rem Setup virtual environment
-if not exist venv (
-    echo Creating virtual environment...
-    python -m venv venv
-    if errorlevel 1 (
-        echo ERROR: Failed to create virtual environment.
-        goto end
-    )
-)
-
-echo Activating virtual environment...
-call venv\Scripts\activate.bat
+rem Check for tkinter
+python -c "import tkinter" > nul 2> nul
 if errorlevel 1 (
-    echo ERROR: Failed to activate virtual environment.
-    goto end
+    echo ERROR: Tkinter not found in Python installation.
+    echo Please run setup_venv.bat first to verify your environment.
+    pause
+    exit /b 1
 )
 
-echo Installing packages...
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-if errorlevel 1 (
-    echo ERROR: Failed to install packages.
-    goto end
-)
-
+rem Run the application
 echo Running scene checker...
 python warudo_scene_checker.py
 if errorlevel 1 (
     echo ERROR: Program execution failed.
-    goto end
+    pause
+    exit /b 1
 )
 
-call venv\Scripts\deactivate.bat
 echo Process completed successfully.
 
-:end
 echo.
 echo Press any key to exit...
-pause
-exit /b
+pause > nul
+exit /b 0
