@@ -1,3 +1,5 @@
+# created by InamineKosuke at Circle GoodLuck
+
 import sys
 import os
 import json

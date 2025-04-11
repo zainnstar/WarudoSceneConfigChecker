@@ -63,3 +63,8 @@ Click "Analyze" to start the check. Results will be displayed in the application
 - サブディレクトリを含める：StreamingAssets のサブディレクトリ内のファイルもチェック
 
 「解析」ボタンをクリックすると、チェックが開始され、結果がアプリケーションウィンドウに表示されます。
+
+## 製作者
+
+稲峰幸助 サークル GoodLuck
+https://x.com/inamine55
