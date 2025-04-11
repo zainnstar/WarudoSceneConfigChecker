@@ -1,0 +1,9 @@
+# Pythonバイトコード
+__pycache__/
+*.pyc
+
+# バッチファイルの一時ログ
+*.log
+
+# specファイルは無視
+*.spec
