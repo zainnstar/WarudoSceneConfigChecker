@@ -91,6 +91,6 @@ Click the "Analyze" button to start checking, and the results will be displayed 
 
 ## Creator / 製作者
 
-Kosuke Inamine - Circle GoodLuck
+Inamine Kosuke - Circle GoodLuck
 稲峰幸助 - サークル GoodLuck
 https://x.com/inamine55
