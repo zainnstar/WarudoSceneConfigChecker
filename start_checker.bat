@@ -29,7 +29,7 @@ if errorlevel 1 (
 
 rem Run the application
 echo Running scene checker...
-python warudo_scene_checker.py
+python main.py
 if errorlevel 1 (
     echo ERROR: Program execution failed.
     pause

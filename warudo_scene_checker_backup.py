@@ -528,7 +528,6 @@ class WarudoSceneChecker(tk.Tk):
         self.text_edit.delete(1.0, tk.END)
         self.text_edit.insert(tk.END, text)
         self.text_edit.config(state=tk.DISABLED)
-    
     def _scan_streaming_assets(self):
         """StreamingAssetsフォルダをスキャンしてファイル一覧を作成"""
         if not self.streaming_assets_path or not os.path.exists(self.streaming_assets_path):
@@ -552,12 +551,24 @@ class WarudoSceneChecker(tk.Tk):
             
             # カテゴリにマッチするかチェック
             current_category = None
+            is_subfolder = False
+            subfolder_name = ""
+            
+            # パス階層を分析
+            path_parts = rel_path.split("/")
+            
             for category, folders in category_folders.items():
                 for folder in folders:
-                    # フォルダ名がカテゴリに含まれているか（大文字小文字を区別せず比較）
-                    path_parts = [part.lower() for part in rel_path.split("/")]
-                    if folder.lower() in path_parts:
-                        current_category = category
+                    for i, part in enumerate(path_parts):
+                        if part.lower() == folder.lower():
+                            current_category = category
+                            
+                            # サブフォルダかどうかの判定
+                            if i < len(path_parts) - 1:
+                                is_subfolder = True
+                                subfolder_name = path_parts[i+1]
+                            break
+                    if current_category:
                         break
                 if current_category:
                     break
@@ -573,7 +584,7 @@ class WarudoSceneChecker(tk.Tk):
                         # rel_pathから実際のフォルダ名を取得（大文字小文字の違いを保持）
                         cat_folder_actual = self._get_actual_folder_name(rel_path, category_folders[current_category])
                         
-                        # カテゴリフォルダから下のパス部分を取得（例: Props/StageProp.warudo）
+                        # カテゴリフォルダから下のパス部分を取得（例: Props/StageProp.warudo または Props/StageProp/item.warudo）
                         category_rel_path = self._get_path_after_category(file_rel_path, cat_folder_actual)
                         
                         # 適切なプレフィックスを決定
@@ -586,17 +597,21 @@ class WarudoSceneChecker(tk.Tk):
                             full_prefix_path = f"{prefix}data/{folder_variant}/{category_rel_path}"
                             path_variants.append(full_prefix_path)
                         
+                        # サブフォルダ情報を追加
                         self.asset_files[current_category].append({
                             "name": os.path.splitext(file)[0],
                             "full_path": full_path,
                             "rel_path": file_rel_path,
                             "category_path": category_rel_path,
                             "asset_path": path_variants[0],  # 最初のバリエーションをデフォルトとして使用
-                            "asset_path_variants": path_variants  # すべてのパスバリエーション
+                            "asset_path_variants": path_variants,  # すべてのパスバリエーション
+                            "is_subfolder": is_subfolder,  # サブフォルダかどうか
+                            "subfolder_name": subfolder_name if is_subfolder else ""  # サブフォルダの名前
                         })
                         
                         if self.debug_mode:
-                            print(f"検出: {file_rel_path} -> {path_variants}")
+                            subfolder_info = f" (サブフォルダ: {subfolder_name})" if is_subfolder else ""
+                            print(f"検出: {file_rel_path}{subfolder_info} -> {path_variants}")
     
     def _get_actual_folder_name(self, path, possible_folders):
         """パスから実際のフォルダ名を取得（大文字小文字の差異を保持）"""
@@ -892,22 +907,58 @@ class WarudoSceneChecker(tk.Tk):
                     return True
         
         return False
-    
     def _check_file_exists(self, asset_path, category):
         """StreamingAssetsフォルダでファイルが存在するか確認"""
         if not self.streaming_assets_path or not asset_path:
             return True  # パスが設定されていない場合はチェックしない
-            
+        
         # パスを正規化（プロトコルとdata/を除去）
         normalized_asset_path = self._normalize_asset_path(asset_path, category)
         
         # カテゴリに対応するアセットリスト
         assets = self.asset_files.get(category, [])
         
+        # サブフォルダを含むパスかどうかをチェック
+        json_has_subfolder = False
+        subfolder_path = None
+        
+        parts = normalized_asset_path.split('/')
+        if len(parts) > 2:  # カテゴリ名の次にサブフォルダがある場合
+            json_has_subfolder = True
+            # サブフォルダを含むパス
+            subfolder_path = '/'.join(parts)
+            
+            # デバッグモードの場合
+            if self.debug_mode:
+                print(f"JSONのサブフォルダパス検証: {subfolder_path}")
+        
         # パスが一致するか確認
         for asset in assets:
             # アセットのパスバリエーション（複数形/単数形対応）をチェック
             asset_path_variants = asset.get('asset_path_variants', [asset.get('asset_path', '')])
+            
+            # 実際のファイルがサブフォルダ内にあるかどうか
+            asset_is_in_subfolder = asset.get('is_subfolder', False)
+            
+            # デバッグモードの場合
+            if self.debug_mode and asset_is_in_subfolder:
+                print(f"アセットはサブフォルダにあります: {asset.get('name')} (subfolder: {asset.get('subfolder_name')})")
+            
+            # JSONパスとファイルシステムのパス構造が異なる場合（一方がサブフォルダ内、もう一方が直接カテゴリフォルダ内）
+            # ファイルは存在するが、構造が異なるためチェックに失敗させる
+            if json_has_subfolder != asset_is_in_subfolder:
+                # ファイル名だけを比較して、同じファイルだけど構造が違う場合を検出
+                json_filename = os.path.basename(normalized_asset_path)
+                asset_filename = os.path.basename(asset.get('category_path', ''))
+                
+                if json_filename.lower() == asset_filename.lower():
+                    if self.debug_mode:
+                        print(f"ファイル名は一致するが構造が異なる: JSON={json_has_subfolder}, Asset={asset_is_in_subfolder}")
+                        print(f"  - JSON path: {normalized_asset_path}")
+                        print(f"  - Asset path: {asset.get('category_path')}")
+                    # 同じファイル名だが構造が異なるので、falseではなくTrueを返す
+                    # これにより、サブフォルダチェックで警告を出せる
+                    return True
             
             # 元のパスでの完全一致チェック
             if asset_path in asset_path_variants:
@@ -928,13 +979,33 @@ class WarudoSceneChecker(tk.Tk):
                 if normalized_asset_path.lower() == full_category_path.lower():
                     return True
                     
-            # ファイル名部分での一致チェック
+                # サブフォルダを含む完全なパスでも検証
+                if json_has_subfolder and subfolder_path.lower() == full_category_path.lower():
+                    return True
+            
+            # ファイル名部分での一致チェック - ただしこれはあくまでファイル名のみの比較であり、パス構造は考慮しない
             asset_filename = os.path.basename(asset_category_path)
             json_filename = os.path.basename(normalized_asset_path)
+            
+            # ファイル名が一致した場合でも、パス構造が異なる場合は注意が必要
             if asset_filename.lower() == json_filename.lower():
+                # サブフォルダ内のファイルと、直接カテゴリフォルダにあるファイルは区別する
+                asset_parent = os.path.dirname(asset_category_path)
+                norm_parent = os.path.dirname(normalized_asset_path)
+                
+                # パスの構造が異なる場合
+                if (json_has_subfolder != asset_is_in_subfolder) or \
+                   (json_has_subfolder and asset_is_in_subfolder and asset_parent.lower() != norm_parent.lower()):
+                    if self.debug_mode:
+                        print(f"サブフォルダ不一致: Asset={asset_parent}, JSON={norm_parent}")
+                    # ファイルは存在するが、構造が異なるので警告を出す必要がある
+                    # ここではTrueを返して、サブフォルダチェックのほうで警告する
+                    return True
+                
                 # デバッグ情報
                 if self.debug_mode:
                     print(f"ファイル名一致: {asset_filename} == {json_filename}")
+                
                 return True
                 
             # デバッグモードの場合、比較情報を表示
