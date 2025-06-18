@@ -7,3 +7,6 @@ __pycache__/
 
 # specファイルは無視
 *.spec
+
+# 個人設定ファイル
+settings.json
